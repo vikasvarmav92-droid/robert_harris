@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Cafe Rush Mini</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #15110f;
+      --panel: #241a16;
+      --accent: #ffb266;
+      --ok: #77e4a5;
+      --warn: #ffd166;
+      --bad: #ff7b7b;
+      --text: #f8efe7;
+      --muted: #ccb8a8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(circle at top, #33231b 0%, var(--bg) 58%);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    .game {
+      width: min(100%, 480px);
+      background: linear-gradient(180deg, #2c1f1a 0%, #1d1512 100%);
+      border: 2px solid #5b4031;
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid #4a3429;
+      border-radius: 12px;
+      padding: 8px;
+      text-align: center;
+    }
+
+    .stat .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .stat .value {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .order {
+      background: var(--panel);
+      border: 1px solid #4a3429;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .order h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .recipe {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .recipe button {
+      appearance: none;
+      border: 1px solid #654637;
+      background: #3a291f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 8px;
+      font-size: 14px;
+      font-weight: 700;
+      touch-action: manipulation;
+    }
+
+    .recipe button:active,
+    .recipe button.active {
+      transform: translateY(1px);
+      border-color: var(--accent);
+      outline: 2px solid rgba(255, 178, 102, 0.25);
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .actions button {
+      flex: 1;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 800;
+      touch-action: manipulation;
+    }
+
+    #serveBtn { background: var(--ok); color: #133123; }
+    #clearBtn { background: #4a3529; color: var(--text); }
+
+    .cup {
+      margin: 12px 0;
+      background: #120d0b;
+      border: 1px solid #3b2a22;
+      border-radius: 12px;
+      min-height: 58px;
+      padding: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .chip {
+      background: #4b3429;
+      border: 1px solid #7a5540;
+      border-radius: 99px;
+      padding: 5px 8px;
+      font-size: 12px;
+      color: #ffe8d8;
+    }
+
+    .message {
+      min-height: 24px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--warn);
+    }
+
+    .message.good { color: var(--ok); }
+    .message.bad { color: var(--bad); }
+
+    .footer {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="game" aria-label="Cafe Rush Mini game">
+    <div class="stats">
+      <div class="stat"><div class="label">Score</div><div id="score" class="value">0</div></div>
+      <div class="stat"><div class="label">Timer</div><div id="timer" class="value">60</div></div>
+      <div class="stat"><div class="label">Streak</div><div id="streak" class="value">0</div></div>
+    </div>
+
+    <section class="order">
+      <h2 id="orderTitle">Order: Espresso</h2>
+      <div id="orderNeed">Need: Coffee Shot</div>
+    </section>
+
+    <div class="recipe" id="recipeButtons"></div>
+
+    <div class="cup" id="cup" aria-live="polite"></div>
+
+    <div class="actions">
+      <button id="serveBtn" type="button">Serve ☕</button>
+      <button id="clearBtn" type="button">Clear</button>
+    </div>
+
+    <p id="message" class="message">Tap ingredients, then Serve.</p>
+    <p class="footer">Phone-friendly mini game. Embed with an iframe in Carrd.</p>
+  </main>
+
+  <script>
+    const ingredients = [
+      "Coffee Shot",
+      "Steamed Milk",
+      "Foam",
+      "Ice",
+      "Chocolate",
+      "Caramel"
+    ];
+
+    const menu = [
+      { name: "Espresso", recipe: ["Coffee Shot"] },
+      { name: "Latte", recipe: ["Coffee Shot", "Steamed Milk"] },
+      { name: "Cappuccino", recipe: ["Coffee Shot", "Steamed Milk", "Foam"] },
+      { name: "Iced Mocha", recipe: ["Coffee Shot", "Ice", "Chocolate"] },
+      { name: "Caramel Macchiato", recipe: ["Coffee Shot", "Steamed Milk", "Caramel"] }
+    ];
+
+    const state = {
+      score: 0,
+      time: 60,
+      streak: 0,
+      cup: [],
+      order: null,
+      running: true
+    };
+
+    const scoreEl = document.getElementById("score");
+    const timerEl = document.getElementById("timer");
+    const streakEl = document.getElementById("streak");
+    const orderTitleEl = document.getElementById("orderTitle");
+    const orderNeedEl = document.getElementById("orderNeed");
+    const cupEl = document.getElementById("cup");
+    const msgEl = document.getElementById("message");
+    const serveBtn = document.getElementById("serveBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const recipeButtons = document.getElementById("recipeButtons");
+
+    function arraysEqual(a, b) {
+      if (a.length !== b.length) return false;
+      return [...a].sort().every((value, index) => value === [...b].sort()[index]);
+    }
+
+    function setMessage(text, tone = "") {
+      msgEl.textContent = text;
+      msgEl.className = `message ${tone}`.trim();
+    }
+
+    function pickOrder() {
+      state.order = menu[Math.floor(Math.random() * menu.length)];
+      orderTitleEl.textContent = `Order: ${state.order.name}`;
+      orderNeedEl.textContent = `Need: ${state.order.recipe.join(" + ")}`;
+    }
+
+    function renderCup() {
+      cupEl.innerHTML = "";
+      state.cup.forEach((item) => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = item;
+        cupEl.appendChild(chip);
+      });
+    }
+
+    function updateStats() {
+      scoreEl.textContent = String(state.score);
+      timerEl.textContent = String(state.time);
+      streakEl.textContent = String(state.streak);
+    }
+
+    ingredients.forEach((name) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = name;
+      btn.addEventListener("click", () => {
+        if (!state.running) return;
+        state.cup.push(name);
+        renderCup();
+      });
+      recipeButtons.appendChild(btn);
+    });
+
+    clearBtn.addEventListener("click", () => {
+      if (!state.running) return;
+      state.cup = [];
+      renderCup();
+      setMessage("Cup cleared. Try again.");
+    });
+
+    serveBtn.addEventListener("click", () => {
+      if (!state.running) return;
+      const correct = arraysEqual(state.cup, state.order.recipe);
+      if (correct) {
+        state.streak += 1;
+        state.score += 10 + Math.min(state.streak * 2, 20);
+        setMessage(`Perfect ${state.order.name}! +${10 + Math.min(state.streak * 2, 20)} pts`, "good");
+      } else {
+        state.streak = 0;
+        state.score = Math.max(0, state.score - 5);
+        setMessage("Wrong drink! -5 pts", "bad");
+      }
+      state.cup = [];
+      renderCup();
+      pickOrder();
+      updateStats();
+    });
+
+    function tick() {
+      if (!state.running) return;
+      state.time -= 1;
+      if (state.time <= 0) {
+        state.running = false;
+        state.time = 0;
+        setMessage(`Time! Final score: ${state.score}. Tap refresh to play again.`, "good");
+        serveBtn.disabled = true;
+        clearBtn.disabled = true;
+      }
+      updateStats();
+    }
+
+    pickOrder();
+    updateStats();
+    renderCup();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
