@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Don't Spill It | Robert Harris</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Bungee&display=swap" rel="stylesheet">
+  <style>
+    :root{--rh-black:#111112;--rh-charcoal:#1b1b1b;--rh-cream:#f4ebdd;--rh-white:#fff;--rh-gold:#c89434;--rh-tan:#c5a98f;--rh-coffee:#5a3a24;--rh-espresso:#2c180e;--rh-red:#b83b32}
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--rh-charcoal);font-family:Archivo,sans-serif}
+    #stage{width:100%;height:100%;display:grid;place-items:center;position:relative;background:radial-gradient(circle at 50% 30%,#474039,#191919 72%)}
+    #shell{position:relative;width:420px;height:760px;max-width:100%;max-height:100%;overflow:hidden;background:var(--rh-cream);box-shadow:0 0 0 2px #000,0 18px 55px #0009}
+    canvas{display:block;width:100%;height:100%;touch-action:none;user-select:none}
+    .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:26px;background:linear-gradient(#111112aa,#111112d9);transition:opacity .4s,visibility .4s;z-index:3}
+    .screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+    .card{width:min(352px,100%);text-align:center;color:var(--rh-cream);background:var(--rh-charcoal);border:3px solid var(--rh-gold);box-shadow:8px 8px 0 #0a0a0a;padding:25px 22px 27px;position:relative}
+    .card:before,.card:after{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:var(--rh-gold);top:10px}.card:before{left:10px}.card:after{right:10px}
+    .brand{font-weight:800;letter-spacing:.16em;font-size:17px}.est{font-size:10px;letter-spacing:.28em;color:var(--rh-gold);margin:4px 0 22px}
+    h1,h2,.number{font-family:Bungee,Impact,sans-serif;font-weight:400}h1{font-size:48px;line-height:.89;margin:0;color:var(--rh-cream);text-shadow:4px 4px 0 #000}h1 span{color:var(--rh-gold)}
+    h2{font-size:38px;line-height:1;margin:3px 0 20px;color:var(--rh-cream)}
+    .rule{height:3px;background:linear-gradient(90deg,transparent,var(--rh-gold),transparent);margin:20px 0}
+    .tagline{font-size:14px;line-height:1.45;font-weight:700;margin:0 8px 13px}.instruction,.cause{font-size:12px;line-height:1.5;color:#d8cdbd;margin:0 4px 22px}
+    button{font:800 13px Archivo,sans-serif;letter-spacing:.08em;color:var(--rh-black);background:var(--rh-gold);border:3px solid #080808;padding:14px 18px;box-shadow:5px 5px 0 #080808;cursor:pointer;transition:transform .12s,box-shadow .12s}
+    button:hover{background:#daa84b;transform:translate(-1px,-1px);box-shadow:6px 6px 0 #080808}button:active{transform:translate(4px,4px);box-shadow:1px 1px 0 #080808}button:focus-visible{outline:4px solid var(--rh-white);outline-offset:5px}
+    .results{display:flex;justify-content:center;gap:38px;margin:8px 0 14px}.result small{display:block;font-size:9px;letter-spacing:.18em;color:var(--rh-gold)}.result .number{font-size:27px;margin-top:2px}
+    @media(max-aspect-ratio:420/760){#shell{width:100vw;height:calc(100vw * 760 / 420)}}
+    @media(min-aspect-ratio:420/760){#shell{height:100vh;width:calc(100vh * 420 / 760)}}
+    @media(prefers-reduced-motion:reduce){.screen,button{transition:none}}
+  </style>
+</head>
+<body>
+<main id="stage" aria-label="Don't Spill It game">
+  <div id="shell">
+    <canvas id="game" width="420" height="760" aria-label="Top down café obstacle game. Drag left and right to steer."></canvas>
+    <section id="start" class="screen" aria-labelledby="game-title">
+      <div class="card"><div class="brand">ROBERT HARRIS</div><div class="est">EST. 1952</div><h1 id="game-title">DON'T<br><span>SPILL IT</span></h1><div class="rule"></div><p class="tagline">Four flat whites. One tray. Try to look professional.</p><p class="instruction">Drag left and right. Smooth hands keep the coffee in the cups.</p><button id="startButton" type="button">PICK UP THE TRAY</button></div>
+    </section>
+    <section id="over" class="screen hidden" aria-labelledby="over-title">
+      <div class="card"><div class="brand">ROBERT HARRIS</div><div class="est">EST. 1952</div><h2 id="over-title">SHIFT OVER</h2><div class="results"><div class="result"><small>DISTANCE</small><div id="finalDistance" class="number">0 m</div></div><div class="result"><small>BEST</small><div id="bestDistance" class="number">0 m</div></div></div><div class="rule"></div><p id="cause" class="cause">Four flat whites became floor whites.</p><button id="againButton" type="button">GO AGAIN</button></div>
+    </section>
+  </div>
+</main>
+<script>
+(() => {
+  'use strict';
+  const W=420,H=760,WALL=42,TRAY_W=128,TRAY_H=92;
+  const C={black:'#111112',charcoal:'#1b1b1b',cream:'#f4ebdd',white:'#fff',gold:'#c89434',tan:'#c5a98f',coffee:'#5a3a24',espresso:'#2c180e',red:'#b83b32',green:'#65715a'};
+  const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
+  const shell=document.querySelector('#shell'),startScreen=document.querySelector('#start'),overScreen=document.querySelector('#over');
+  const startButton=document.querySelector('#startButton'),againButton=document.querySelector('#againButton');
+  const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  let state='START',last=performance.now(),elapsed=0,distance=0,coffee=100,displayCoffee=100,speed=152;
+  let tray={x:210,y:668,v:0,accel:0},cups=[],obstacles=[],lid=null,lidTime=0,lidSpawn=11;
+  let spawnDistance=0,floorOffset=0,invuln=0,flash=0,shake=0,steadyTime=0,multiplier=1,lastCause='Too much wrist.';
+  let pointer={active:false,id:null,x:210},keys={left:false,right:false};
+
+  function loadBest(){try{return Number(localStorage.getItem('rh-dont-spill-best'))||0}catch(e){return 0}}
+  function saveBest(v){try{localStorage.setItem('rh-dont-spill-best',String(v))}catch(e){}}
+  let best=loadBest();
+
+  function reset(){
+    elapsed=distance=0;coffee=displayCoffee=100;speed=152;tray={x:210,y:668,v:0,accel:0};pointer.x=210;
+    cups=[26,27.7,29.4,31.1].map(k=>({k,s:0,sv:0}));obstacles=[];lid=null;lidTime=0;lidSpawn=rand(9,14);
+    spawnDistance=0;floorOffset=0;invuln=flash=shake=steadyTime=0;multiplier=1;lastCause='Too much wrist.';
+    generateRow(-90);generateRow(-360);
+  }
+  function begin(){reset();state='PLAYING';startScreen.classList.add('hidden');overScreen.classList.add('hidden');canvas.focus();}
+  startButton.addEventListener('click',begin);againButton.addEventListener('click',begin);
+
+  function canvasX(e){const r=canvas.getBoundingClientRect();return clamp((e.clientX-r.left)*W/r.width,0,W)}
+  canvas.addEventListener('pointerdown',e=>{if(state!=='PLAYING')return;pointer.active=true;pointer.id=e.pointerId;pointer.x=canvasX(e);canvas.setPointerCapture(e.pointerId);e.preventDefault()});
+  canvas.addEventListener('pointermove',e=>{if(pointer.active&&e.pointerId===pointer.id){pointer.x=canvasX(e);e.preventDefault()}});
+  function release(e){if(pointer.active&&(!e||e.pointerId===pointer.id)){try{if(canvas.hasPointerCapture(pointer.id))canvas.releasePointerCapture(pointer.id)}catch(err){}pointer.active=false;pointer.id=null}}
+  canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);
+  addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k==='arrowleft'||k==='a'){keys.left=true;e.preventDefault()}if(k==='arrowright'||k==='d'){keys.right=true;e.preventDefault()}});
+  addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k==='arrowleft'||k==='a')keys.left=false;if(k==='arrowright'||k==='d')keys.right=false});
+
+  function generateRow(y=-100){
+    const gap=215-(55*clamp(elapsed/75,0,1)),half=gap/2;
+    const center=rand(WALL+half+8,W-WALL-half-8),choices=['chair','wet','toddler','stander','door','dog'];
+    let type=choices[Math.floor(Math.random()*choices.length)];
+    if(type==='door'){
+      const left=Math.random()<.5;obstacles.push({type,y,x:left?WALL:W-WALL,side:left?-1:1,phase:rand(0,6.28),dead:false});
+    }else if(type==='dog'){
+      const left=Math.random()<.5;let ownerX=left?55:365,dogX=left?center-half-14:center+half+14;
+      obstacles.push({type,y,x:ownerX,dogX,side:left?-1:1,dead:false});
+    }else{
+      const slots=[];if(center-half-WALL>38)slots.push(rand(WALL+20,center-half-18));if(W-WALL-(center+half)>38)slots.push(rand(center+half+18,W-WALL-20));
+      slots.forEach((x,i)=>obstacles.push({type:i?(['chair','wet'][Math.floor(Math.random()*2)]):type,x,y:y+rand(-12,12),baseX:x,phase:rand(0,6.28),stand:0,dead:false}));
+    }
+  }
+
+  function update(dt){
+    elapsed+=dt;speed=152+148*(1-Math.exp(-elapsed/70));floorOffset=(floorOffset+speed*dt)%48;
+    let steer=0;if(keys.left)steer--;if(keys.right)steer++;
+    if(steer)pointer.x=clamp(tray.x+steer*85,WALL+TRAY_W/2,W-WALL-TRAY_W/2);else if(!pointer.active)pointer.x=tray.x;
+    const targetV=clamp((pointer.x-tray.x)*9,-520,520);
+    const dv=clamp(targetV-tray.v,-2600*dt,2600*dt);
+    tray.v+=dv;tray.accel=dv/Math.max(dt,.0001);tray.x+=tray.v*dt;
+    const minX=WALL+TRAY_W/2,maxX=W-WALL-TRAY_W/2;
+    if(tray.x<minX||tray.x>maxX){tray.x=clamp(tray.x,minX,maxX);tray.v*=.25}
+    const threshold=lidTime>0?.52:.30,h=dt*2.6;let maxS=0,spilling=false;
+    cups.forEach(c=>{const damping=lidTime>0?4.15:3.1;c.sv+=(-c.k*c.s-damping*c.sv+.005*tray.accel)*h;c.s+=c.sv*h;c.s=clamp(c.s,-1.6,1.6);maxS=Math.max(maxS,Math.abs(c.s));if(Math.abs(c.s)>threshold){spilling=true;coffee-=(Math.abs(c.s)-threshold)*30*dt}});
+    if(spilling){steadyTime=0;multiplier=1;lastCause='Too much wrist.'}else if(maxS<.22){steadyTime+=dt;multiplier=steadyTime>9?4:steadyTime>5.5?3:steadyTime>2.5?2:1}else{steadyTime=Math.max(0,steadyTime-dt*.8)}
+    distance+=speed*dt/20*multiplier;displayCoffee+=(coffee-displayCoffee)*Math.min(1,dt*6);
+    invuln=Math.max(0,invuln-dt);flash=Math.max(0,flash-dt);shake=Math.max(0,shake-dt);lidTime=Math.max(0,lidTime-dt);lidSpawn-=dt;
+    obstacles.forEach(o=>{o.y+=speed*dt;if(o.type==='toddler')o.x=o.baseX+Math.sin(elapsed*2.5+o.phase)*22;if(o.type==='stander'){const d=tray.y-o.y;if(d<225&&d>0&&o.stand===0)o.stand=.001;if(o.stand>0)o.stand+=dt}});
+    obstacles=obstacles.filter(o=>o.y<H+100);spawnDistance+=speed*dt;if(spawnDistance>rand(255,295)){spawnDistance=0;generateRow()}
+    if(!lid&&lidTime<=0&&lidSpawn<=0){lid={x:rand(WALL+28,W-WALL-28),y:-40};lidSpawn=rand(14,21)}
+    if(lid){lid.y+=speed*dt;if(circleRect(lid.x,lid.y,19,tray.x-64,tray.y-46,128,92)){lidTime=6.5;lid=null}else if(lid.y>H+30)lid=null}
+    if(invuln<=0){for(const o of obstacles){if(collides(o)){hit(o);break}}}
+    coffee=clamp(coffee,0,100);if(coffee<=0)endGame();
+  }
+  function circleRect(cx,cy,r,x,y,w,h){const qx=clamp(cx,x,x+w),qy=clamp(cy,y,y+h);return (cx-qx)**2+(cy-qy)**2<r*r}
+  function segRect(x1,y1,x2,y2,thick,r){
+    for(let i=0;i<=10;i++){const t=i/10;if(circleRect(x1+(x2-x1)*t,y1+(y2-y1)*t,thick,r.x,r.y,r.w,r.h))return true}return false;
+  }
+  function collides(o){
+    const r={x:tray.x-57,y:tray.y-39,w:114,h:78};
+    if(o.type==='chair')return circleRect(o.x,o.y,22,r.x,r.y,r.w,r.h);
+    if(o.type==='wet')return circleRect(o.x,o.y,19,r.x,r.y,r.w,r.h);
+    if(o.type==='toddler')return circleRect(o.x,o.y,20,r.x,r.y,r.w,r.h);
+    if(o.type==='stander')return circleRect(o.x+(o.stand>.33?(o.x<210?28:-28):0),o.y,o.stand>.33?27:18,r.x,r.y,r.w,r.h);
+    if(o.type==='dog')return circleRect(o.x,o.y,20,r.x,r.y,r.w,r.h)||circleRect(o.dogX,o.y+22,18,r.x,r.y,r.w,r.h)||segRect(o.x,o.y,o.dogX,o.y+22,5,r);
+    if(o.type==='door'){const a=Math.sin(elapsed*1.7+o.phase)*1.18,x2=o.x+Math.cos(a)*(o.side<0?104:-104),y2=o.y+Math.sin(a)*104;return segRect(o.x,o.y,x2,y2,8,r)}return false;
+  }
+  function hit(o){coffee-=18;invuln=.7;flash=.28;shake=reduceMotion?0:.3;steadyTime=0;multiplier=1;cups.forEach((c,i)=>c.sv+=(Math.random()<.5?-1:1)*rand(7.5,9.5));
+    lastCause={stander:'He stood up without looking.',dog:'Clotheslined by a dog lead.',wet:'Wet floor sign. Ironic.',toddler:'The toddler chose chaos.',door:'The door won.',chair:'Four flat whites became floor whites.'}[o.type]||'Four flat whites became floor whites.';
+  }
+  function endGame(){state='GAME_OVER';release();const score=Math.floor(distance);best=Math.max(best,score);saveBest(best);document.querySelector('#finalDistance').textContent=score+' m';document.querySelector('#bestDistance').textContent=best+' m';document.querySelector('#cause').textContent=lastCause;overScreen.classList.remove('hidden');setTimeout(()=>againButton.focus(),420)}
+
+  function rounded(x,y,w,h,r,fill,stroke,lw=1){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke()}}
+  function drawFloor(){ctx.fillStyle=C.cream;ctx.fillRect(0,0,W,H);ctx.strokeStyle='#d9cebd';ctx.lineWidth=1;for(let y=floorOffset-48;y<H;y+=48){ctx.beginPath();ctx.moveTo(WALL,y);ctx.lineTo(W-WALL,y);ctx.stroke()}for(let x=WALL;x<=W-WALL;x+=56){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}ctx.fillStyle=C.charcoal;ctx.fillRect(0,0,WALL,H);ctx.fillRect(W-WALL,0,WALL,H);ctx.fillStyle=C.gold;ctx.fillRect(WALL-3,0,3,H);ctx.fillRect(W-WALL,0,3,H);for(let y=floorOffset-96;y<H;y+=192){ctx.fillStyle='#f9f3e9';ctx.fillRect(WALL+4,y,W-2*WALL-8,3);ctx.fillStyle=C.gold;ctx.fillRect(12,y+18,18,4);ctx.fillRect(390,y+18,18,4)}}
+  function drawObstacle(o){ctx.save();
+    if(o.type==='chair'){ctx.translate(o.x,o.y);ctx.rotate(.1*Math.sin(o.phase));rounded(-19,-18,38,36,6,C.tan,C.espresso,3);ctx.fillStyle=C.coffee;ctx.fillRect(-25,-22,7,44);ctx.fillRect(18,-22,7,44);ctx.fillRect(-16,-25,32,7)}
+    if(o.type==='wet'){ctx.translate(o.x,o.y);ctx.fillStyle=C.gold;ctx.strokeStyle=C.espresso;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,-25);ctx.lineTo(20,22);ctx.lineTo(-20,22);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle=C.charcoal;ctx.fillRect(-9,4,18,3);ctx.beginPath();ctx.arc(0,-7,4,0,7);ctx.fill()}
+    if(o.type==='toddler'){ctx.translate(o.x,o.y);ctx.fillStyle='#7c5e49';ctx.beginPath();ctx.arc(0,-5,12,0,7);ctx.fill();ctx.fillStyle=C.cream;ctx.beginPath();ctx.arc(0,8,16,0,7);ctx.fill();ctx.strokeStyle=C.gold;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-9,17);ctx.lineTo(-14,27);ctx.moveTo(9,17);ctx.lineTo(14,27);ctx.stroke()}
+    if(o.type==='stander'){ctx.translate(o.x,o.y);ctx.fillStyle=C.coffee;ctx.beginPath();ctx.arc(o.x<210?-17:17,0,26,0,7);ctx.fill();ctx.fillStyle=C.tan;ctx.fillRect(o.x<210?7:-23,-19,16,38);if(o.stand>0&&o.stand<.34){ctx.strokeStyle=C.gold;ctx.lineWidth=4;ctx.globalAlpha=1-o.stand/.34;ctx.beginPath();ctx.arc(0,0,25+o.stand*75,0,7);ctx.stroke()}if(o.stand>.33){ctx.fillStyle=C.charcoal;ctx.beginPath();ctx.arc(o.x<210?28:-28,0,25,0,7);ctx.fill();ctx.fillStyle=C.tan;ctx.beginPath();ctx.arc(o.x<210?28:-28,-4,10,0,7);ctx.fill()}}
+    if(o.type==='dog'){ctx.strokeStyle=C.espresso;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(o.x,o.y);ctx.lineTo(o.dogX,o.y+22);ctx.stroke();ctx.fillStyle=C.charcoal;ctx.beginPath();ctx.arc(o.x,o.y,19,0,7);ctx.fill();ctx.fillStyle=C.tan;ctx.beginPath();ctx.arc(o.x,o.y-6,9,0,7);ctx.fill();ctx.fillStyle=C.coffee;rounded(o.dogX-17,o.y+9,34,25,10,C.coffee,C.espresso,2);ctx.beginPath();ctx.arc(o.dogX+(o.side<0?12:-12),o.y+14,11,0,7);ctx.fill()}
+    if(o.type==='door'){const a=Math.sin(elapsed*1.7+o.phase)*1.18,x2=Math.cos(a)*(o.side<0?104:-104),y2=Math.sin(a)*104;ctx.translate(o.x,o.y);ctx.strokeStyle=C.coffee;ctx.lineWidth=16;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(x2,y2);ctx.stroke();ctx.strokeStyle=C.gold;ctx.lineWidth=3;ctx.stroke();ctx.fillStyle=C.gold;ctx.beginPath();ctx.arc(0,0,7,0,7);ctx.fill();ctx.fillStyle=C.charcoal;ctx.beginPath();ctx.arc(x2*.78,y2*.78,4,0,7);ctx.fill()}
+    ctx.restore();
+  }
+  function drawLid(){if(!lid)return;ctx.save();ctx.translate(lid.x,lid.y);ctx.shadowColor='#0005';ctx.shadowBlur=8;ctx.fillStyle=C.cream;ctx.strokeStyle=C.charcoal;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,20,17,0,0,7);ctx.fill();ctx.stroke();ctx.strokeStyle=C.gold;ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,11,.3,2.8);ctx.stroke();ctx.restore()}
+  function drawTray(){ctx.save();ctx.translate(tray.x,tray.y);ctx.shadowColor='#0007';ctx.shadowBlur=12;ctx.shadowOffsetY=7;rounded(-64,-46,128,92,18,C.charcoal,C.gold,4);rounded(-55,-37,110,74,13,'#292827','#070707',2);const positions=[[-29,-19],[29,-19],[-29,20],[29,20]];positions.forEach((p,i)=>drawCup(p[0],p[1],cups[i]));ctx.restore()}
+  function drawCup(x,y,c){ctx.save();ctx.translate(x,y);const r=18,off=c.s*10;ctx.fillStyle='#d8cbbb';ctx.beginPath();ctx.arc(0,0,r+3,0,7);ctx.fill();ctx.fillStyle=C.espresso;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();ctx.save();ctx.beginPath();ctx.arc(0,0,r-2,0,7);ctx.clip();ctx.fillStyle='#b77d37';ctx.beginPath();ctx.ellipse(off,0,17+Math.abs(c.s)*3,14,0,0,7);ctx.fill();ctx.fillStyle='#d7a85d';ctx.globalAlpha=.7;ctx.beginPath();ctx.ellipse(off-4,-4,7,3,-.2,0,7);ctx.fill();ctx.restore();ctx.strokeStyle=C.cream;ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,r+1,0,7);ctx.stroke();if(Math.abs(c.s)>(lidTime>0?.52:.30)){const side=Math.sign(c.s);ctx.fillStyle=C.coffee;ctx.beginPath();ctx.ellipse(side*22,2,5+Math.min(5,Math.abs(c.s)*3),3,0,0,7);ctx.fill()}if(lidTime>0){ctx.fillStyle='#eadfceeb';ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();ctx.strokeStyle=C.gold;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,11,.3,2.8);ctx.stroke()}ctx.restore()}
+  function drawHud(){ctx.save();ctx.shadowColor='#0008';ctx.shadowOffsetY=5;rounded(12,12,396,76,5,C.charcoal,C.gold,3);ctx.shadowColor='transparent';ctx.fillStyle=C.gold;ctx.font='700 9px Archivo';ctx.fillText('DISTANCE',25,32);ctx.fillStyle=C.cream;ctx.font='24px Bungee';ctx.fillText(Math.floor(distance)+' m',24,59);ctx.font='700 9px Archivo';ctx.fillStyle=C.gold;ctx.fillText('COFFEE',151,32);rounded(151,41,143,17,2,'#090909','#6c604e',2);let meterColor=displayCoffee<30?C.red:displayCoffee<60?'#d18732':C.gold;ctx.fillStyle=meterColor;ctx.fillRect(155,45,135*clamp(displayCoffee/100,0,1),9);ctx.font='800 10px Archivo';ctx.textAlign='right';if(multiplier>1){ctx.fillStyle=C.gold;ctx.fillText('STEADY x'+multiplier,393,34)}if(lidTime>0){ctx.fillStyle=C.cream;ctx.fillText('LIDS '+lidTime.toFixed(1),393,54)}ctx.textAlign='left';ctx.restore()}
+  function render(){ctx.clearRect(0,0,W,H);ctx.save();if(shake>0){ctx.translate(rand(-5,5)*shake/.3,rand(-4,4)*shake/.3)}drawFloor();obstacles.forEach(drawObstacle);drawLid();drawTray();drawHud();if(flash>0){ctx.fillStyle=`rgba(184,59,50,${flash*.65})`;ctx.fillRect(0,0,W,H);ctx.strokeStyle=C.cream;ctx.lineWidth=5;ctx.strokeRect(5,5,W-10,H-10)}ctx.restore()}
+  function loop(now){const dt=Math.min((now-last)/1000,.033);last=now;if(state==='PLAYING')update(dt);render();requestAnimationFrame(loop)}
+  function resize(){const r=shell.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,3);canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);ctx.setTransform(canvas.width/W,0,0,canvas.height/H,0,0)}
+  new ResizeObserver(resize).observe(shell);resize();reset();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
